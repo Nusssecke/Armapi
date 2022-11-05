@@ -15,6 +15,7 @@ class UploadResponse(
 ) {
 
     companion object{
+
         fun of(response: Response): UploadResponse {
             val json = response.body!!.string()
             return Json.decodeFromString(json)

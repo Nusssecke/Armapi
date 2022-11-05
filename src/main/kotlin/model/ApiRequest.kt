@@ -9,8 +9,13 @@ import okhttp3.RequestBody.Companion.toRequestBody
 
 @Serializable
 sealed class ApiRequest {
+    val jsonLength: Int
+        get() {
+            return this.toJson().length
+        }
+
     fun toJson(): String {
-        return Json.encodeToString(this)
+        return Json{classDiscriminator = "#class"}.encodeToString(this)
     }
 
     fun toRequestBody(): RequestBody {

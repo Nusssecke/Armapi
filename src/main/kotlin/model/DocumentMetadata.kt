@@ -29,8 +29,8 @@ import okhttp3.Response
 class DocumentMetadata(
     val deleted: Boolean,
     val lastModified: String,
-    val lastOpened: String,
-    val lastOpenedPage: Int,
+    val lastOpened: String = "",
+    val lastOpenedPage: Int = -1,
     val metadatamodified: Boolean,
     val modified: Boolean,
     val parent: String,
@@ -40,11 +40,6 @@ class DocumentMetadata(
     val version: Int,
     val visibleName: String
 ): ApiRequest() {
-
-    val jsonLength: Int
-        get() {
-            return this.toJson().length
-        }
 
     // TODO Put into super class or interface
     fun upload(gcsId: String, uuid: String, userToken: String): Response {
@@ -60,7 +55,7 @@ class DocumentMetadata(
         fun of(gcsId: String, userToken: String): DocumentMetadata {
             val downloadUrl = DownloadResponse.of(gcsId, userToken).url
             val json = Net.get(downloadUrl, userToken).body!!.string()
-            return jsonParser.decodeFromString(json)
+            return jsonParser.decodeFromString<DocumentMetadata>(json)
         }
 
         fun makeDefaultMetadata(): DocumentMetadata {
@@ -71,7 +66,7 @@ class DocumentMetadata(
                 lastOpenedPage = 0,
                 metadatamodified = true,
                 modified = true,
-                parent = "trash",
+                parent = "root",
                 pinned = false,
                 synced = false,
                 _type = "DocumentType",

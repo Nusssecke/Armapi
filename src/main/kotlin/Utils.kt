@@ -19,6 +19,12 @@ class Utils {
             val hex = hash.toHex()
             return hex
         }
+
+        fun sortRootFile(rootFile: String): String {
+            val lineList = rootFile.split("\n")
+            lineList.sortedBy { it.split(":")[2] }
+            return lineList.joinToString("\n" )
+        }
     }
 
 }

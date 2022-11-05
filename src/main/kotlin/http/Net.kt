@@ -19,8 +19,9 @@ class Net {
         const val DOWNLOAD = "$INTERNAL_CLOUD/sync/v2/signed-urls/downloads"
         const val UPLOAD = "$INTERNAL_CLOUD/sync/v2/signed-urls/uploads"
 
-        val JSON: MediaType = "application/json; charset=utf-8".toMediaTypeOrNull()!!
+        val JSON: MediaType = "application/json".toMediaTypeOrNull()!!
         val PDF: MediaType = "application/pdf; charset=utf-8".toMediaTypeOrNull()!!
+        val BINARY: MediaType = "application/octet-stream".toMediaTypeOrNull()!!
 
         private const val JRMAPI_NET_TAG = "Jrmapi-Net"
 
@@ -75,10 +76,10 @@ class Net {
             // return sendRequest(request)
         }
 
-        fun put(url: String, token: String, payload: String): Response {
+        fun put(url: String, token: String, payload: String, mediaType: MediaType? = JSON): Response {
             val request: Request = Request.Builder()
                 .url(url)
-                .put(payload.toRequestBody(JSON))
+                .put(payload.toRequestBody(mediaType))
                 .header("Authorization", "Bearer $token")
                 .header("x-goog-content-length-range", "0,7000000000")
                 .build()
@@ -100,17 +101,17 @@ class Net {
                 .protocol(Protocol.HTTP_1_0)
                 .message("Error").build()
             try {
-                Log.d(JRMAPI_NET_TAG, "Url: " + request.url.toString())
+                // Log.d(JRMAPI_NET_TAG, "Url: " + request.url.toString())
                 // http.Log.d(JRMAPI_NET_TAG, request.headers().toString());
                 val response = client.newCall(request).execute()
-                Log.d(JRMAPI_NET_TAG, "Reponse code: " + response.code)
+                // Log.d(JRMAPI_NET_TAG, "Reponse code: " + response.code)
                 if (response.code == 200) {
                     res = response
                 } else {
-                    Log.e(JRMAPI_NET_TAG, response.body!!.string())
+                    // Log.e(JRMAPI_NET_TAG, response.body!!.string())
                 }
             } catch (e: IOException) {
-                Log.e(JRMAPI_NET_TAG, "Error while launching request", e)
+                // Log.e(JRMAPI_NET_TAG, "Error while launching request", e)
             }
             return res
         }

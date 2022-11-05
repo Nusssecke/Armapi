@@ -114,11 +114,6 @@ data class DocumentContent (
     val textScale: Int
 ): ApiRequest() {
 
-    val jsonLength: Int
-        get() {
-            return this.toJson().length
-        }
-
     fun upload(gcsId: String, uuid: String, userToken: String): Response {
         val uploadResponse = UploadRequest("$uuid.content", this.jsonLength, Net.PUT, gcsId).upload(userToken)
         val uploadUrl = uploadResponse.url

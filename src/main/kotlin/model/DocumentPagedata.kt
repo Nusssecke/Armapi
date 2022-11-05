@@ -13,11 +13,6 @@ class DocumentPagedata(
 
     constructor(string: String): this(string.split("\n"))
 
-    val jsonLength: Int
-        get() {
-            return this.toJson().length
-        }
-
     fun upload(gcsId: String, uuid: String, userToken: String): Response {
         val uploadResponse = UploadRequest("$uuid.pagedata", this.jsonLength, Net.PUT, gcsId).upload(userToken)
         val uploadUrl = uploadResponse.url
