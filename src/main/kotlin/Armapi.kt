@@ -3,7 +3,6 @@ import http.Net.Companion.DOWNLOAD
 import model.*
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
-import okhttp3.Response
 import java.io.File
 import java.util.stream.Collectors
 
@@ -25,51 +24,40 @@ class Armapi(deviceToken: String, workingDirectory: File) {
         createWorkdir(workingDirectory)
     }
 
-    var rootFile
+    private var _rootFile: RootFile? = null
+    var rootFile: RootFile
         get() {
-            if(field is null){
-                return field
-            } else {
-                return getRootFileGCSId()
+            if(_rootFile == null){
+                _rootFile = downloadRootFile()
             }
+            return _rootFile as RootFile
         }
         set(value) {
-            // TODO
+            _rootFile = value
         }
 
-    fun getRootFileGCSId(): String {
+
+    // Downloads the current root file
+    // The root file lists all documents uploaded in the cloud
+    private fun downloadRootFile(): RootFile {
+        // Get rootFile GCS id
         val rootFileIndexResponse = Net.post(DOWNLOAD, userToken, DownloadRequest(Net.GET, "root"))
         val downloadResponse = DownloadResponse.of(rootFileIndexResponse)
 
         val rootFileIdUrl = downloadResponse.url // Extract the storage.googleapis url
 
-        return Net.get(rootFileIdUrl, userToken).body!!.string()
-    }
-
-    fun getRootFileResponse(rootId: String): Response {
-        val rootFileUrlResponse = Net.post(DOWNLOAD, userToken, DownloadRequest(Net.GET, rootId))
+        // Download rootFile
+        val rootFileGCSId = Net.get(rootFileIdUrl, userToken).body!!.string()
+        val rootFileUrlResponse = Net.post(DOWNLOAD, userToken, DownloadRequest(Net.GET, rootFileGCSId))
         val rootFileUrl = DownloadResponse.of(rootFileUrlResponse).url
 
-        return Net.get(rootFileUrl, userToken)
+        val response = Net.get(rootFileUrl, userToken)
+        return RootFile(response)
     }
 
-    // Fixes the error when there are files in the root index which cannot be downloaded
-    fun fixApiError() {
-        val documents = listOf<RMDocument>() // TODO rootToDocument(getRootFileGCSId())
-        for (document in documents){
-            val entryIds = document.loadIndexFile(userToken)
-            for (entry in entryIds){
-                if (!document.downloadIndexFileEntry(entry, userToken)) {
-
-                }
-            }
-            println("${document.gcsId}: ${document.uuid}: ${document.metadata!!.visibleName}")
-
-        }
-    }
-
+    // Set the new rootFile GCSId
     // Returns the newRootFileGeneration
-    fun uploadRootFileIndex(oldRootFileGeneration: String, rootFileGCSId: String): String {
+    fun changeRootFileIndex(rootFileGCSId: String, oldRootFileGeneration: String): String {
         // Uploading root file index
         println("rootPath: $rootFileGCSId")
         val uploadRootFileIndexRequestBody = UploadRootFileIndex(oldRootFileGeneration.toLong(), Net.PUT, "root", rootFileGCSId).toRequestBody()
@@ -77,15 +65,9 @@ class Armapi(deviceToken: String, workingDirectory: File) {
             .url(Net.UPLOAD)
             .post(uploadRootFileIndexRequestBody)
             .header("Authorization", "Bearer $userToken")
-            //.header("Content-MD5", rootPath.encodeUtf8().md5().base64())
             .build()
         val uploadRootFileRequestResponse = Net.sendRequest(uploadRootFileRequest)
         // println(uploadRootFileRequestResponse.body!!.string())
-
-
-        // Looks good for md5-content header testing needed
-        // println(rootPath.encodeUtf8().md5().base64())
-        // check content type and User-Agent
 
         val uploadUrlRootFileIndex = UploadResponse.of(uploadRootFileRequestResponse).url
         val requestRootFileIndex: Request = Request.Builder()
@@ -93,7 +75,6 @@ class Armapi(deviceToken: String, workingDirectory: File) {
             .put(rootFileGCSId.toRequestBody(null))
             .header("x-goog-if-generation-match", oldRootFileGeneration)
             .header("x-goog-content-length-range", "0,7000000000")
-            //.header("Content-MD5", rootPath.encodeUtf8().md5().base64())
             .build()
         val newGeneration = Net.sendRequest(requestRootFileIndex).header("x-goog-generation")!!
         return newGeneration
@@ -130,21 +111,35 @@ class Armapi(deviceToken: String, workingDirectory: File) {
         println(Net.client.newCall(request).execute().code)
     }
 
+    // Fixes the error when there are files in the root index which cannot be downloaded
+    fun fixApiError() {
+        val documents = rootFile.toDocuments()
+        for (document in documents){
+            val entryIds = document.loadIndexFile(userToken)
+            for (entry in entryIds){
+                if (!document.downloadIndexFileEntry(entry, userToken)) {
+
+                }
+            }
+            println("${document.gcsId}: ${document.uuid}: ${document.metadata!!.visibleName}")
+
+        }
+    }
+
     fun removeGCSIdFromRootFile(gcsId: String){
         // Update root file
         // Get root file
-        val rootFileResponse = getRootFileResponse(getRootFileGCSId())
 
         // REMOVE bad gcsId
-        val rootFile = rootFileResponse.body!!.string().split("\n").stream().filter { !it.contains(gcsId) }.collect(Collectors.joining("\n"))
+        val rootFileString = rootFile.string.split("\n").stream().filter { !it.contains(gcsId) }.collect(Collectors.joining("\n"))
         val rootFileGeneration = 0 // TODO getRootGeneration()
 
 
         // Upload new root file
-        val rootPath = Utils.sha265(rootFile)
+        val rootPath = Utils.sha265(rootFileString)
         val uploadRootFileResponse = Net.post(Net.UPLOAD, userToken, UploadIndexFileRequest(Net.PUT, rootPath))
         val uploadUrlRootFile = UploadResponse.of(uploadRootFileResponse).url
-        val generation = Net.put(uploadUrlRootFile, userToken, rootFile, null).header("x-goog-generation")!!
+        val generation = Net.put(uploadUrlRootFile, userToken, rootFileString, null).header("x-goog-generation")!!
 
         // println("Generation 1 and 2: $rootFileGeneration, $generation ")
 
@@ -185,6 +180,12 @@ class Armapi(deviceToken: String, workingDirectory: File) {
         println(Net.client.newCall(request).execute().code)
     }
 
+    fun downloadFile(gcsId: String){
+        // TODO Put in Net
+        // Make rootFile, DocumentContent, DocumentMetadata, DocumentPagedata, etc...
+        // use this
+    }
+
     companion object {
         private const val JRMAPI_TAG = "Jrmapi"
         // https://docs.google.com/document/u/0/d/1peZh79C2BThlp2AC3sITzinAQKJccQ1gn9ppdCIWLl8/mobilebasic
@@ -195,7 +196,6 @@ class Armapi(deviceToken: String, workingDirectory: File) {
 
 
             val jrmapi = Armapi(deviceToken, File(System.getProperty("user.home")))
-            println(jrmapi.getRootFileGCSId())
             // jrmapi.fixApiError()
 
             // SUS

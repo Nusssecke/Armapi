@@ -7,6 +7,7 @@ import http.Net.Companion.DOWNLOAD
 import java.lang.IndexOutOfBoundsException
 import java.util.*
 
+// Wrapper around an index File
 class RMDocument(
     val gcsId: String, // gcs id
     val uuid: String
@@ -138,19 +139,19 @@ class RMDocument(
 
         // Update root file
         // Get root file
-        val rootFileResponse = jrmapi.getRootFileResponse(jrmapi.getRootDirectoryId())
+        val rootFile = jrmapi.rootFile
         val sum: Int = contentLength.toInt() + metadataLength.toInt() + pagedataLength.toInt() + pdfLength.toInt()
-        val rootFile = rootFileResponse.body!!.string().trimEnd() + "\n" + "$indexFileGcsId:80000000:$newUUID:4:$sum\n"
-        val rootFileGeneration = jrmapi.getRootGeneration()
+        val rootFileString = rootFile.string.trimEnd() + "\n" + "$indexFileGcsId:80000000:$newUUID:4:$sum\n"
+        val rootFileGeneration = rootFile.generation
 
 
         // Upload new root file
-        val rootPath = Utils.sha265(rootFile)
+        val rootPath = Utils.sha265(rootFileString)
         val uploadRootFileResponse = Net.post(Net.UPLOAD, userToken, UploadIndexFileRequest(Net.PUT, rootPath))
         val uploadUrlRootFile = UploadResponse.of(uploadRootFileResponse).url
-        Net.put(uploadUrlRootFile, userToken, rootFile, null).header("x-goog-generation")!!
+        Net.put(uploadUrlRootFile, userToken, rootFileString, null).header("x-goog-generation")!!
 
-        val newGeneration = jrmapi.uploadRootFileIndex(rootFileGeneration, rootPath)
+        val newGeneration = jrmapi.changeRootFileIndex(rootFileGeneration.toString(), rootPath)
 
         jrmapi.syncComplete(newGeneration)
 
